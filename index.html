@@ -139,7 +139,7 @@ body{
 
 .grid{
   display:grid;
-  grid-template-columns:repeat(4, 1fr);
+  grid-template-columns:repeat(8, 1fr);
   gap:10px;
   perspective:1000px;
 }
@@ -388,9 +388,13 @@ body{
 .play-again:focus-visible{ outline:2px solid var(--accent-amber); outline-offset:2px; }
 
 @media (max-width:520px){
-  .grid{ gap:6px; }
+  .grid{ gap:4px; }
   .stats{ gap:6px; }
   .stat{ padding:6px 10px; min-width:64px; }
+  .port-number{ font-size:10px; }
+  .port-name{ font-size:7px; }
+  .port-protocol{ font-size:6px; }
+  .desc-text{ font-size:6.5px; }
 }
 
 @media (prefers-reduced-motion: reduce){
@@ -505,7 +509,18 @@ function buildDeck(){
     portCards.push({ pairId: idx, type: "port", port: p.port, label: p.label, protocol: p.protocol });
     descCards.push({ pairId: idx, type: "desc", desc: p.purpose, label: p.label });
   });
-  return [...shuffle(portCards), ...shuffle(descCards)];
+  shuffle(portCards);
+  shuffle(descCards);
+
+  const deck = [];
+  const rows = 4;
+  const perRow = 4;
+  for(let r = 0; r < rows; r++){
+    const greenChunk = portCards.slice(r * perRow, r * perRow + perRow);
+    const blueChunk = descCards.slice(r * perRow, r * perRow + perRow);
+    deck.push(...greenChunk, ...blueChunk);
+  }
+  return deck;
 }
 
 function renderCard(card, index){
@@ -518,7 +533,7 @@ function renderCard(card, index){
 
   const backContent = card.type === "port"
     ? `<div class="port-top"><span class="port-number">${card.port}</span><span class="port-name">${card.label}</span></div><div class="port-protocol">${card.protocol}</div>`
-    : `<div class="desc-text">${card.desc}</div><div class="desc-sub">${card.label}</div>`;
+    : `<div class="desc-text">${card.desc}</div>`;
 
   el.innerHTML = `
     <div class="card-inner">

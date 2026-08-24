@@ -387,14 +387,17 @@ body{
 }
 .play-again:focus-visible{ outline:2px solid var(--accent-amber); outline-offset:2px; }
 
+.grid.compact{ gap:6px; }
+.compact .stats{ gap:6px; }
+.wrap.compact .stat{ padding:6px 10px; min-width:64px; }
+.grid.compact .port-number{ font-size:14px; }
+.grid.compact .port-name{ font-size:10px; }
+.grid.compact .port-protocol{ font-size:8px; }
+.grid.compact .desc-text{ font-size:8px; }
+
 @media (max-width:520px){
-  .grid{ gap:4px; }
   .stats{ gap:6px; }
   .stat{ padding:6px 10px; min-width:64px; }
-  .port-number{ font-size:10px; }
-  .port-name{ font-size:7px; }
-  .port-protocol{ font-size:6px; }
-  .desc-text{ font-size:6.5px; }
 }
 
 @media (prefers-reduced-motion: reduce){
@@ -478,7 +481,6 @@ let moves = 0;
 let timerInterval = null;
 let secondsElapsed = 0;
 let boardLocked = false;
-let pendingMismatch = null;
 
 const grid = document.getElementById("grid");
 const movesVal = document.getElementById("movesVal");
@@ -610,10 +612,33 @@ function handleCardClick(index){
     } else {
       grid.children[i1].classList.add("mismatch");
       grid.children[i2].classList.add("mismatch");
-      pendingMismatch = [i1, i2];
+      setTimeout(() => {
+        grid.children[i1].classList.remove("flipped", "mismatch");
+        grid.children[i2].classList.remove("flipped", "mismatch");
+        grid.children[i1].setAttribute("aria-label", "Face down jack");
+        grid.children[i2].setAttribute("aria-label", "Face down jack");
+        flipped = [];
+        boardLocked = false;
+      }, 900);
     }
   }
 }
+
+function updateGridColumns(){
+  const width = grid.getBoundingClientRect().width || window.innerWidth;
+  const isCompact = width < 560;
+  const cols = isCompact ? 4 : 8;
+  grid.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
+  grid.classList.toggle("compact", isCompact);
+  document.querySelector(".wrap").classList.toggle("compact", isCompact);
+}
+
+if(window.ResizeObserver){
+  new ResizeObserver(updateGridColumns).observe(document.querySelector(".wrap"));
+} else {
+  window.addEventListener("resize", updateGridColumns);
+}
+updateGridColumns();
 
 function newGame(){
   clearInterval(timerInterval);
@@ -623,7 +648,6 @@ function newGame(){
   matchedCount = 0;
   flipped = [];
   boardLocked = false;
-  pendingMismatch = null;
 
   movesVal.textContent = "0";
   matchesVal.textContent = "0/16";
@@ -638,18 +662,6 @@ function newGame(){
 }
 
 document.getElementById("playAgainBtn").addEventListener("click", newGame);
-
-document.addEventListener("dblclick", () => {
-  if(!pendingMismatch) return;
-  const [i1, i2] = pendingMismatch;
-  grid.children[i1].classList.remove("flipped", "mismatch");
-  grid.children[i2].classList.remove("flipped", "mismatch");
-  grid.children[i1].setAttribute("aria-label", "Face down jack");
-  grid.children[i2].setAttribute("aria-label", "Face down jack");
-  flipped = [];
-  pendingMismatch = null;
-  boardLocked = false;
-});
 
 // header new game button
 const headerBtn = document.createElement("button");

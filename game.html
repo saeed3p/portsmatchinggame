@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Port Match &mdash; Patch Bay</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+.grid{
+  display:grid;
+  grid-template-columns:repeat(8, 1fr);
+  gap:10px;
+  perspective:1000px;
+}
+
+.card{
+  aspect-ratio:3/4;
+  position:relative;
+  cursor:pointer;
+}
+.card.matched{ cursor:default; }
+
+.card-inner{
+  position:relative;
+  width:100%;
+  height:100%;
+  transform-style:preserve-3d;
+  transition:transform .45s cubic-bezier(.2,.7,.3,1);
+}
+.card.flipped .card-inner,
+.card.matched .card-inner{
+  transform:rotateY(180deg);
+}
+
+.face{
+  position:absolute;
+  inset:0;
+  border-radius:8px;
+  backface-visibility:hidden;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:6px;
+  border:1px solid var(--line);
+}
+
+.face-front{
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+}
+
+.card.type-port .face-front{
+  background: linear-gradient(180deg, #142720, #0D1714);
+  border-color: rgba(67,255,176,0.35);
+}
+.card.type-port .face-front .qmark{ color: var(--accent-green); }
+.card.type-port .face-front .jack{ border-color: rgba(67,255,176,0.5); }
+.card.type-port .face-front .jack span{ background: var(--accent-green); }
+
+.card.type-desc .face-front{
+  background: linear-gradient(180deg, #10212D, #0B161F);
+  border-color: rgba(79,168,255,0.35);
+}
+.card.type-desc .face-front .qmark{ color: var(--accent-blue); }
+.card.type-desc .face-front .jack{ border-color: rgba(79,168,255,0.5); }
+.card.type-desc .face-front .jack span{ background: var(--accent-blue); }
+
+.face-front .qmark{
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--text-dim);
+  letter-spacing:.1em;
+}
+
+.led{
+  position:absolute;
+  top:7px;
+  right:7px;
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#2A3A3E;
+  border:1px solid #3A4A4E;
+  transition:background .2s ease, box-shadow .2s ease;
+}
+.card.flipped .led{
+  background:var(--accent-amber);
+  box-shadow:0 0 6px var(--accent-amber);
+}
+.card.matched .led{
+  background:var(--accent-green);
+  box-shadow:0 0 8px var(--accent-green);
+}
+.card.mismatch .led{
+  background:var(--accent-red);
+  box-shadow:0 0 6px var(--accent-red);
+}
+
+.face-back{
+  transform:rotateY(180deg);
+  background:linear-gradient(180deg, #142023, #0E1618);
+}
+.card.matched.type-port .face-back{
+  background:linear-gradient(180deg, #0F2620, #0C1E19);
+  border-color: rgba(67,255,176,0.35);
+}
+.card.matched.type-desc .face-back{
+  background:linear-gradient(180deg, #0E1D28, #0B1620);
+  border-color: rgba(79,168,255,0.4);
+}
+
+.port-top{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+}
+
+.port-number{
+  font-family:var(--mono);
+  font-weight:700;
+  font-size:clamp(16px,2.8vw,21px);
+  color:var(--text);
+  line-height:1.1;
+}
+
+.port-name{
+  font-family:var(--mono);
+  font-weight:600;
+  font-size:clamp(11px,1.8vw,13px);
+  color:var(--text);
+  letter-spacing:.04em;
+}
+
+.port-protocol{
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--accent-green);
+  letter-spacing:.02em;
+  text-align:center;
+  margin-top:8px;
+  line-height:1.3;
+}
+
+.desc-text{
+  font-family:var(--sans);
+  font-size:9.5px;
+  font-weight:500;
+  text-align:center;
+  line-height:1.25;
+  color:var(--text);
+}
+
+.grid.compact{ gap:6px; }
+.wrap.compact .stat{ padding:6px 10px; min-width:64px; }
+.grid.compact .port-number{ font-size:14px; }
+.grid.compact .port-name{ font-size:10px; }
+.grid.compact .port-protocol{ font-size:8px; }
+.grid.compact .desc-text{ font-size:8px; }
+
+.back-link{
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--text-dim);
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:14px;
+}
+.back-link:hover{ color:var(--accent-green); }
+
+.overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(6,10,11,0.82);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  z-index:10;
+}
+.overlay.show{ display:flex; }
+
+.win-card{
+  background:var(--panel);
+  border:1px solid var(--accent-green);
+  border-radius:10px;
+  padding:32px 28px;
+  max-width:340px;
+  width:100%;
+  text-align:center;
+  box-shadow:0 0 40px rgba(67,255,176,0.15);
+}
+.win-card .eyebrow{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.16em;
+  color:var(--accent-green);
+  text-transform:uppercase;
+  margin:0 0 10px;
+}
+.win-card h2{
+  font-family:var(--mono);
+  margin:0 0 16px;
+  font-size:22px;
+}
+.win-stats{
+  display:flex;
+  justify-content:center;
+  gap:20px;
+  margin-bottom:20px;
+}
+.win-stats div{ text-align:center; }
+.win-stats .value{
+  font-family:var(--mono);
+  font-size:22px;
+  color:var(--text);
+  font-weight:700;
+}
+.win-stats .label{
+  font-family:var(--mono);
+  font-size:9px;
+  color:var(--text-dim);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="wrap">
+  <a class="back-link" href="index.html">&larr; Back to Patch Bay</a>
+  <div class="header">
+    <div class="title-block">
+      <p class="eyebrow">Networking Fundamentals</p>
+      <h1>Patch Bay: Port Match</h1>
+      <p>Flip two jacks at a time. Match every well known port number to its protocol to light up the whole bay.</p>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <div class="label">Moves</div>
+        <div class="value" id="movesVal">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Matched</div>
+        <div class="value" id="matchesVal">0/16</div>
+      </div>
+      <div class="stat">
+        <div class="label">Time</div>
+        <div class="value" id="timeVal">0:00</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="section-label">Bay 01 &mdash; 32 jacks</p>
+  <div class="grid" id="grid"></div>
+
+  <p class="footer-note">Tip: TCP/UDP port numbers are static, but the roles behind them are what actually matter on the wire.</p>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="win-card">
+    <p class="eyebrow">Bay fully patched</p>
+    <h2>All 16 ports matched</h2>
+    <div class="win-stats">
+      <div>
+        <div class="value" id="finalMoves">0</div>
+        <div class="label">Moves</div>
+      </div>
+      <div>
+        <div class="value" id="finalTime">0:00</div>
+        <div class="label">Time</div>
+      </div>
+    </div>
+    <button class="btn primary" id="playAgainBtn">New game</button>
+  </div>
+</div>
+
+<script src="ports-data.js"></script>
+<script>
+let deck = [];
+let flipped = [];
+let matchedCount = 0;
+let moves = 0;
+let timerInterval = null;
+let secondsElapsed = 0;
+let boardLocked = false;
+
+const wrap = document.getElementById("wrap");
+const grid = document.getElementById("grid");
+const movesVal = document.getElementById("movesVal");
+const matchesVal = document.getElementById("matchesVal");
+const timeVal = document.getElementById("timeVal");
+const overlay = document.getElementById("overlay");
+const finalMoves = document.getElementById("finalMoves");
+const finalTime = document.getElementById("finalTime");
+
+function shuffle(arr){
+  for(let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function formatTime(s){
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return m + ":" + String(sec).padStart(2, "0");
+}
+
+function buildDeck(){
+  const portCards = [];
+  const descCards = [];
+  PORTS.forEach((p, idx) => {
+    portCards.push({ pairId: idx, type: "port", port: p.port, label: p.label, protocol: p.protocol });
+    descCards.push({ pairId: idx, type: "desc", desc: p.purpose, label: p.label });
+  });
+  shuffle(portCards);
+  shuffle(descCards);
+
+  const deck = [];
+  const rows = 4;
+  const perRow = 4;
+  for(let r = 0; r < rows; r++){
+    const greenChunk = portCards.slice(r * perRow, r * perRow + perRow);
+    const blueChunk = descCards.slice(r * perRow, r * perRow + perRow);
+    deck.push(...greenChunk, ...blueChunk);
+  }
+  return deck;
+}
+
+function renderCard(card, index){
+  const el = document.createElement("div");
+  el.className = "card type-" + card.type;
+  el.dataset.index = index;
+  el.setAttribute("tabindex", "0");
+  el.setAttribute("role", "button");
+  el.setAttribute("aria-label", "Face down jack");
+
+  const backContent = card.type === "port"
+    ? `<div class="port-top"><span class="port-number">${card.port}</span><span class="port-name">${card.label}</span></div><div class="port-protocol">${card.protocol}</div>`
+    : `<div class="desc-text">${card.desc}</div>`;
+
+  el.innerHTML = `
+    <div class="card-inner">
+      <div class="face face-front">
+        <div class="led"></div>
+        <div class="jack"><span></span><span></span><span></span></div>
+        <div class="qmark">JACK</div>
+      </div>
+      <div class="face face-back">
+        <div class="led"></div>
+        ${backContent}
+      </div>
+    </div>
+  `;
+
+  el.addEventListener("click", () => handleCardClick(index));
+  el.addEventListener("keydown", (e) => {
+    if(e.key === "Enter" || e.key === " "){
+      e.preventDefault();
+      handleCardClick(index);
+    }
+  });
+
+  return el;
+}
+
+function startTimerIfNeeded(){
+  if(timerInterval) return;
+  timerInterval = setInterval(() => {
+    secondsElapsed++;
+    timeVal.textContent = formatTime(secondsElapsed);
+  }, 1000);
+}
+
+function handleCardClick(index){
+  if(boardLocked) return;
+  const cardEl = grid.children[index];
+  if(cardEl.classList.contains("flipped") || cardEl.classList.contains("matched")) return;
+  if(flipped.length === 2) return;
+
+  startTimerIfNeeded();
+  cardEl.classList.add("flipped");
+  cardEl.setAttribute("aria-label", "Face up jack");
+  flipped.push(index);
+
+  if(flipped.length === 2){
+    moves++;
+    movesVal.textContent = moves;
+    boardLocked = true;
+
+    const [i1, i2] = flipped;
+    const c1 = deck[i1];
+    const c2 = deck[i2];
+    const isMatch = c1.pairId === c2.pairId && c1.type !== c2.type;
+
+    if(isMatch){
+      setTimeout(() => {
+        grid.children[i1].classList.add("matched");
+        grid.children[i2].classList.add("matched");
+        grid.children[i1].setAttribute("aria-label", "Matched jack");
+        grid.children[i2].setAttribute("aria-label", "Matched jack");
+        matchedCount++;
+        matchesVal.textContent = matchedCount + "/16";
+        flipped = [];
+        boardLocked = false;
+        if(matchedCount === 16){
+          clearInterval(timerInterval);
+          timerInterval = null;
+          finalMoves.textContent = moves;
+          finalTime.textContent = formatTime(secondsElapsed);
+          setTimeout(() => overlay.classList.add("show"), 500);
+        }
+      }, 400);
+    } else {
+      grid.children[i1].classList.add("mismatch");
+      grid.children[i2].classList.add("mismatch");
+      setTimeout(() => {
+        grid.children[i1].classList.remove("flipped", "mismatch");
+        grid.children[i2].classList.remove("flipped", "mismatch");
+        grid.children[i1].setAttribute("aria-label", "Face down jack");
+        grid.children[i2].setAttribute("aria-label", "Face down jack");
+        flipped = [];
+        boardLocked = false;
+      }, 900);
+    }
+  }
+}
+
+function newGame(){
+  clearInterval(timerInterval);
+  timerInterval = null;
+  secondsElapsed = 0;
+  moves = 0;
+  matchedCount = 0;
+  flipped = [];
+  boardLocked = false;
+
+  movesVal.textContent = "0";
+  matchesVal.textContent = "0/16";
+  timeVal.textContent = "0:00";
+  overlay.classList.remove("show");
+
+  deck = buildDeck();
+  grid.innerHTML = "";
+  deck.forEach((card, idx) => {
+    grid.appendChild(renderCard(card, idx));
+  });
+}
+
+document.getElementById("playAgainBtn").addEventListener("click", newGame);
+
+const headerBtn = document.createElement("button");
+headerBtn.className = "btn secondary";
+headerBtn.textContent = "New game";
+headerBtn.addEventListener("click", newGame);
+document.querySelector(".stats").after(headerBtn);
+
+function updateGridColumns(){
+  const width = grid.getBoundingClientRect().width || window.innerWidth;
+  const isCompact = width < 560;
+  const cols = isCompact ? 4 : 8;
+  grid.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
+  grid.classList.toggle("compact", isCompact);
+  wrap.classList.toggle("compact", isCompact);
+}
+
+if(window.ResizeObserver){
+  new ResizeObserver(updateGridColumns).observe(wrap);
+} else {
+  window.addEventListener("resize", updateGridColumns);
+}
+updateGridColumns();
+
+newGame();
+</script>
+
+</body>
+</html>
